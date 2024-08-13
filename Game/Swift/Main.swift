@@ -1,6 +1,7 @@
 import SwiftUI
 
-@main struct GameApp: App {
+@main struct Game: App {
 
     var body: some Scene { WindowGroup { Renderer() } }
 }
+

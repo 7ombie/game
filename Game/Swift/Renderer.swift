@@ -9,7 +9,7 @@ struct Renderer: NSViewRepresentable {
 
         view.delegate = context.coordinator
         view.device = context.coordinator.device
-        view.colorPixelFormat = colorPixelFormat
+        view.colorPixelFormat = COLOR_PIXEL_FORMAT
         view.drawableSize = view.frame.size
         view.preferredFramesPerSecond = 60
         view.enableSetNeedsDisplay = false
@@ -19,7 +19,7 @@ struct Renderer: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ nsView: MTKView, context: Context) { }
+    func updateNSView(_ nsView: MTKView, context: Context) { /* */ }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 }
@@ -35,7 +35,6 @@ class Coordinator: NSObject, MTKViewDelegate {
     private let viewport: MTLViewport
     private let textures: any MTLTexture
     private let vertexBuffer: any MTLBuffer
-    private let tilemapBuffer: any MTLBuffer
     private let pipelineState: any MTLRenderPipelineState
     private let samplerState: any MTLSamplerState
     private let commandQueue: any MTLCommandQueue
@@ -44,22 +43,20 @@ class Coordinator: NSObject, MTKViewDelegate {
 
         device = MTLCreateSystemDefaultDevice()!
 
-        let label = "Background Shader"
-        let library = device.makeDefaultLibrary()!
-        let pipelineDescriptor = makeRenderPipelineDescriptor(pixelShader: "tile", label: label, library: library)
-        let samplerDescriptor = makeSampleDescriptor()
         let loader = MTKTextureLoader(device: device)
+        let samplerDescriptor = MTLSamplerDescriptor(normalized: false, filter: .nearest)
+        let pipelineDescriptor = MTLRenderPipelineDescriptor(fragShader: "tile", library: device.makeDefaultLibrary()!)
 
-        level = levels[0]
+        level = Level(1, gridSize: [16, 13])
         keyboard = Keyboard()
+        uniforms = Uniforms(zoom: 4, gridSize: level.gridSize)
         viewport = MTLViewport(width: 2560, height: 1600)
-        uniforms = Uniforms(zoom: 4, camera: [0, 0], gridSize: level.gridSize)
         textures = try! loader.newTexture(name: "Tileset", scaleFactor: 1.0, bundle: nil, options: [.generateMipmaps: false, .SRGB: true])
+
         pipelineState = try! device.makeRenderPipelineState(descriptor: pipelineDescriptor)
-        tilemapBuffer = device.makeBuffer(bytes: level.tilemap, length: level.bufferLength, options: [])!
-        vertexBuffer = device.makeBuffer(bytes: Canvas.vertices, length: Canvas.bufferLength, options: [])!
-        samplerState = device.makeSamplerState(descriptor: samplerDescriptor)!
-        commandQueue = device.makeCommandQueue()!
+        vertexBuffer  = device.makeBuffer(bytes: Canvas.vertices, length: Canvas.length, options: [])!
+        samplerState  = device.makeSamplerState(descriptor: samplerDescriptor)!
+        commandQueue  = device.makeCommandQueue()!
 
         super.init()
 
@@ -73,19 +70,20 @@ class Coordinator: NSObject, MTKViewDelegate {
 
     func draw(in view: MTKView) {
 
-        let buffer = self.commandQueue.makeCommandBuffer()!
+        let buffer = commandQueue.makeCommandBuffer()!
         let descriptor = view.currentRenderPassDescriptor!
         let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor)!
+        let tilemap = device.makeBuffer(bytes: level.tilemap, length: level.length, options: [])!
 
-        keyboard.update(uniforms: &uniforms, level: level)
+        keyboard.update(uniforms: &uniforms, viewport: viewport)
 
-        encoder.setViewport(self.viewport)
-        encoder.setRenderPipelineState(self.pipelineState)
+        encoder.setViewport(viewport)
+        encoder.setRenderPipelineState(pipelineState)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
 
         encoder.setFragmentTexture(textures, index: 0)
         encoder.setFragmentSamplerState(samplerState, index: 0)
-        encoder.setFragmentBuffer(tilemapBuffer, offset: 0, index: 0)
+        encoder.setFragmentBuffer(tilemap, offset: 0, index: 0)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
 
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
