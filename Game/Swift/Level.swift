@@ -141,7 +141,7 @@ class Location {
 
         let initialCount = tilespace.count
 
-        if tile == nil { tilespace.formIntersection(congruents) }
+        tilespace.formIntersection(congruents)
 
         if tilespace.count == 1 { tile = tilespace.first }
 
