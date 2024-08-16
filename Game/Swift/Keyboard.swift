@@ -1,4 +1,4 @@
-import AppKit // for `NSEvent`
+import AppKit
 
 struct Keyboard {
 
@@ -22,7 +22,9 @@ struct Keyboard {
     mutating func update(uniforms: inout Uniforms, viewport: MTLViewport) {
 
         let zoom = UInt32(uniforms.zoom)
-        let heightOfMap = uniforms.gridSize.y * TILE_SIZE * zoom
+        let size = UInt32(Tile.size)
+
+        let heightOfMap = uniforms.gridSize.y * size * zoom
         let bottomOfMap = heightOfMap - uniforms.camera.y * zoom
 
         if isPressed[.left]! { uniforms.camera.x &-= 1 }
@@ -42,5 +44,6 @@ struct Keyboard {
             isPressed[.backspace] = false
         }
     }
-    
+
 }
+

@@ -1,39 +1,22 @@
 typealias Tile = UInt16
 
-let TILE_SIZE: UInt32 = 32
-
 extension Tile {
+
+    static let size = 32
 
     enum Inversion: Tile { case none, horizontal, vertical, combined }
 
-    init(index: Self, rotate: Bool, inversion: Inversion) { self = (index << 3) | (rotate ? 4 : 0) | (inversion.rawValue) }
+    init(index: Self, rotate: Bool, inversion: Inversion) {
+
+        self = (index << 3) | (rotate ? 4 : 0) | (inversion.rawValue)
+    }
 }
 
 struct Congruents {
 
-    enum Edge { case void, wall, door }
+    enum Edge { case wall, door }
 
-    let east, north, west, south:  Set<Tile>
-
-    private let eastern_void: Set = [
-        VOID_FLOOR, WESTERN_WALL, NORTHWEST_CORNER, SOUTHWEST_CORNER, VERTICAL_ALLEY,
-        NORTHERN_ROOM, WESTERN_ROOM, SOUTHERN_ROOM, ENCLOSED_ROOM
-    ]
-
-    private let northern_void: Set = [
-        SOUTHERN_WALL, SOUTHEAST_CORNER, SOUTHWEST_CORNER, HORIZONTAL_ALLEY,
-        EASTERN_ROOM, WESTERN_ROOM, SOUTHERN_ROOM, ENCLOSED_ROOM
-    ]
-
-    private let western_void: Set = [
-        VOID_FLOOR, EASTERN_WALL, NORTHEAST_CORNER, SOUTHEAST_CORNER, VERTICAL_ALLEY,
-        EASTERN_ROOM, NORTHERN_ROOM, SOUTHERN_ROOM, ENCLOSED_ROOM
-    ]
-
-    private let southern_void: Set = [
-        VOID_FLOOR, NORTHERN_WALL, NORTHEAST_CORNER, NORTHWEST_CORNER, HORIZONTAL_ALLEY,
-        EASTERN_ROOM, NORTHERN_ROOM, WESTERN_ROOM, ENCLOSED_ROOM
-    ]
+    let east, north, west, south: Set<Tile>
 
     private let eastern_door: Set = [
         OPEN_FLOOR, EASTERN_WALL, NORTHERN_WALL, SOUTHERN_WALL,
@@ -81,41 +64,10 @@ struct Congruents {
 
     init(east: Edge, north: Edge, west: Edge, south: Edge) {
 
-        self.east  = east  == .door ? eastern_door  : east  == .wall ? eastern_wall  : eastern_void
-        self.north = north == .door ? northern_door : north == .wall ? northern_wall : northern_void
-        self.west  = west  == .door ? western_door  : west  == .wall ? western_wall  : western_void
-        self.south = south == .door ? southern_door : south == .wall ? southern_wall : southern_void
-    }
-}
-
-struct Location {
-
-    var tile: Tile?
-
-    var tilespace: Set = [
-        VOID_FLOOR, OPEN_FLOOR,
-        EASTERN_WALL, NORTHERN_WALL, WESTERN_WALL, SOUTHERN_WALL,
-        NORTHEAST_CORNER, SOUTHEAST_CORNER, NORTHWEST_CORNER, SOUTHWEST_CORNER,
-        EASTERN_ROOM, NORTHERN_ROOM, WESTERN_ROOM, SOUTHERN_ROOM, ENCLOSED_ROOM,
-        HORIZONTAL_ALLEY, VERTICAL_ALLEY
-    ]
-
-    let x, y, i: Int
-    let east, west, north, south: Int?
-    let neighbours: [Int?]
-
-    init(index: Int, gridSize: Intx2) {
-
-        i = index
-        x = i % gridSize.x
-        y = i / gridSize.x
-
-        east  = x < gridSize.x - 1 ? i + 1 : y * gridSize.x
-        west  = x > 0 ? i - 1 : y * gridSize.x + gridSize.x - 1
-        north = y > 0 ? i - gridSize.x : nil
-        south = y < gridSize.y - 1 ? i + gridSize.x : nil
-
-        neighbours = [east, north, west, south]
+        self.east  = east  == .door ? eastern_door  : eastern_wall
+        self.north = north == .door ? northern_door : northern_wall
+        self.west  = west  == .door ? western_door  : western_wall
+        self.south = south == .door ? southern_door : southern_wall
     }
 }
 
@@ -138,7 +90,6 @@ let HORIZONTAL_ALLEY = Tile(index: 3, rotate: false, inversion: .none)
 let VERTICAL_ALLEY   = Tile(index: 3, rotate: true,  inversion: .horizontal)
 
 let congruents: [Tile: Congruents] = [
-    VOID_FLOOR:       Congruents(east: .void, north: .void, west: .void, south: .void),
     OPEN_FLOOR:       Congruents(east: .door, north: .door, west: .door, south: .door),
     EASTERN_WALL:     Congruents(east: .wall, north: .door, west: .door, south: .door),
     NORTHERN_WALL:    Congruents(east: .door, north: .wall, west: .door, south: .door),

@@ -47,7 +47,8 @@ class Coordinator: NSObject, MTKViewDelegate {
         let samplerDescriptor = MTLSamplerDescriptor(normalized: false, filter: .nearest)
         let pipelineDescriptor = MTLRenderPipelineDescriptor(fragShader: "tile", library: device.makeDefaultLibrary()!)
 
-        level = Level(1, gridSize: [16, 13])
+        level = Level(1, gridSize: [32, 13])
+
         keyboard = Keyboard()
         uniforms = Uniforms(zoom: 4, gridSize: level.gridSize)
         viewport = MTLViewport(width: 2560, height: 1600)

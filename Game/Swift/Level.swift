@@ -1,94 +1,150 @@
-class Level {
+struct Level {
 
     let gridSize: Intx2
     let number, area, length: Int
 
-    var locations: [Location]
-    var tilemap: [Tile] { locations.map { location in location.tile ?? 0 } }
+    var grid: [Location] = []
+
+    var tilemap: [Tile] { grid.map(\.tile!) }
 
     init(_ number: Int, gridSize: Intx2) {
+
+        func selectEntrypoint() -> Location? {
+
+            var lowestCount = Int.max
+            var lowestLocations: [Location] = []
+
+            for location in grid where location.tile == nil {
+
+                let count = location.tilespace.count
+
+                if count == lowestCount { lowestLocations.append(location) }
+                else if count < lowestCount { (lowestCount, lowestLocations) = (count, [location]) }
+            }
+
+            return lowestLocations.randomElement() // returns `nil` when empty
+        }
 
         self.number = number
         self.gridSize = gridSize
         self.area = gridSize.x * gridSize.y
         self.length = area * MemoryLayout<Tile>.stride
-        self.locations = []
 
-        for index in 0 ..< area { locations.append(Location(index: index, gridSize: gridSize)) }
+        for index in 0 ..< area { grid.append(Location(at: index)) }
 
-        generate()
-    }
+        for location in grid { location.referenceNeighbours(in: grid, of: gridSize) }
 
-    func generate() {
-
-        func findStartingLocationIndex() -> Int? {
-
-            var lowestCount = 18
-            var lowestLocations: [Int] = []
-
-            for location in locations where location.tile == nil {
-
-                let count = location.tilespace.count
-
-                if count == lowestCount { lowestLocations.append(location.i) }
-                else if count < lowestCount {
-
-                    lowestCount = count
-                    lowestLocations = [location.i]
-                }
-            }
-
-            return if lowestCount == 18 { nil } else { lowestLocations.randomElement()! }
-        }
-
-        func collapseTilespace(of location: Location) -> Location {
-
-            func updateNeighbours(of location: Location) {
-
-                func reduceTilespace(index: Int, congruents: Set<Tile>) {
-
-                    let initialCount = locations[index].tilespace.count
-
-                    if locations[index].tile == nil { locations[index].tilespace.formIntersection(congruents) }
-
-                    let finalCount = locations[index].tilespace.count
-
-                    if finalCount == 1 { locations[index].tile = locations[index].tilespace.first! }
-
-                    if finalCount < initialCount { updateNeighbours(of: locations[index]) }
-                }
-
-                var easternCongruents:  Set<Tile> = []
-                var northernCongruents: Set<Tile> = []
-                var westernCongruents:  Set<Tile> = []
-                var southernCongruents: Set<Tile> = []
-
-                for tile in location.tilespace {
-
-                    easternCongruents.formUnion(congruents[tile]!.east)
-                    northernCongruents.formUnion(congruents[tile]!.north)
-                    westernCongruents.formUnion(congruents[tile]!.west)
-                    southernCongruents.formUnion(congruents[tile]!.south)
-                }
-
-                if location.east  != nil { reduceTilespace(index: location.east!,  congruents: easternCongruents)  }
-                if location.north != nil { reduceTilespace(index: location.north!, congruents: northernCongruents) }
-                if location.west  != nil { reduceTilespace(index: location.west!,  congruents: westernCongruents)  }
-                if location.south != nil { reduceTilespace(index: location.south!, congruents: southernCongruents) }
-            }
-
-            var location = location
-            let tile = location.tilespace.randomElement()!
-
-            location.tile = tile
-            location.tilespace = [tile]
-
-            updateNeighbours(of: location)
-
-            return location
-        }
-
-        while let index = findStartingLocationIndex() { locations[index] = collapseTilespace(of: locations[index]) }
+        while let location = selectEntrypoint() { location.collapseTilespace() }
     }
 }
 
+class Location {
+
+    let index: Int
+
+    var tile: Tile?
+
+    unowned var east:  Location!
+    unowned var north: Location!
+    unowned var west:  Location!
+    unowned var south: Location!
+
+    var tilespace: Set = [
+        OPEN_FLOOR, EASTERN_WALL, NORTHERN_WALL, WESTERN_WALL, SOUTHERN_WALL,
+        NORTHEAST_CORNER, SOUTHEAST_CORNER, NORTHWEST_CORNER, SOUTHWEST_CORNER,
+        EASTERN_ROOM, NORTHERN_ROOM, WESTERN_ROOM, SOUTHERN_ROOM, ENCLOSED_ROOM,
+        HORIZONTAL_ALLEY, VERTICAL_ALLEY
+    ]
+
+    init(at index: Int) { self.index = index }
+
+    func referenceNeighbours(in grid: [Location], of gridSize: Intx2) {
+
+        let x = index % gridSize.x
+        let y = index / gridSize.x
+
+        east  = grid[x < gridSize.x - 1 ? index + 1 : y * gridSize.x]
+        north = y > 0 ? grid[index - gridSize.x] : nil
+        west  = grid[x > 0 ? index - 1 : y * gridSize.x + gridSize.x - 1]
+        south = y < gridSize.y - 1 ? grid[index + gridSize.x] : nil
+    }
+
+    func collapseTilespace() {
+
+        func isAdjacent(to tile: Tile) -> Bool {
+
+            return isHorizontallyAdjacent(to: tile) || isVerticallyAdjacent(to: tile)
+        }
+
+        func isHorizontallyAdjacent(to tile: Tile) -> Bool {
+
+            if let adjacentTile = east.tile, adjacentTile == tile { return true }
+            if let adjacentTile = west.tile, adjacentTile == tile { return true }
+
+            return false
+        }
+
+        func isVerticallyAdjacent(to tile: Tile) -> Bool {
+
+            if let adjacentTile = north?.tile, adjacentTile == tile { return true }
+            if let adjacentTile = south?.tile, adjacentTile == tile { return true }
+
+            return false
+        }
+
+        func random(when adjacent: (Tile) -> Bool, to tile: Tile, wins odds: Int, of total: Int) -> Bool {
+
+            tilespace.contains(tile) && adjacent(tile) && Int.random(in: 1 ... total) <= odds
+        }
+
+        tile = if random(when: isAdjacent, to: OPEN_FLOOR, wins: 4, of: 5) {
+
+            OPEN_FLOOR
+
+        } else if random(when: isHorizontallyAdjacent, to: HORIZONTAL_ALLEY, wins: 49, of: 50) {
+
+            HORIZONTAL_ALLEY
+
+        } else if random(when: isVerticallyAdjacent, to: VERTICAL_ALLEY, wins: 49, of: 50) {
+
+            VERTICAL_ALLEY
+
+        } else { tilespace.randomElement() }
+
+        tilespace = [tile!]
+        notifyNeighbours()
+    }
+
+    func notifyNeighbours() {
+
+        var easternCongruents:  Set<Tile> = []
+        var northernCongruents: Set<Tile> = []
+        var westernCongruents:  Set<Tile> = []
+        var southernCongruents: Set<Tile> = []
+
+        for candidate in tilespace {
+
+            easternCongruents.formUnion(congruents[candidate]!.east)
+            northernCongruents.formUnion(congruents[candidate]!.north)
+            westernCongruents.formUnion(congruents[candidate]!.west)
+            southernCongruents.formUnion(congruents[candidate]!.south)
+        }
+
+        if east.tile == nil { east.intersectTilespace(with: easternCongruents)  }
+        if west.tile == nil { west.intersectTilespace(with: westernCongruents)  }
+
+        if let north, north.tile == nil { north.intersectTilespace(with: northernCongruents) }
+        if let south, south.tile == nil { south.intersectTilespace(with: southernCongruents) }
+    }
+
+    func intersectTilespace(with congruents: Set<Tile>) {
+
+        let initialCount = tilespace.count
+
+        if tile == nil { tilespace.formIntersection(congruents) }
+
+        if tilespace.count == 1 { tile = tilespace.first }
+
+        if tilespace.count < initialCount { notifyNeighbours() }
+    }
+}
