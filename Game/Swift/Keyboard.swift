@@ -21,6 +21,7 @@ struct Keyboard {
 
     mutating func update(uniforms: inout Uniforms, viewport: MTLViewport) {
 
+        let drop = UInt32(viewport.height)
         let zoom = UInt32(uniforms.zoom)
         let size = UInt32(Tile.size)
 
@@ -31,7 +32,7 @@ struct Keyboard {
         else if isPressed[.right]! { uniforms.camera.x &+= 1 }
 
         if isPressed[.up]!, uniforms.camera.y > 0 { uniforms.camera.y -= 1 }
-        else if isPressed[.down]!, bottomOfMap >= UInt32(viewport.height) { uniforms.camera.y += 1 }
+        else if isPressed[.down]!, bottomOfMap >= drop { uniforms.camera.y += 1 }
 
         if isPressed[.enter]! {
 

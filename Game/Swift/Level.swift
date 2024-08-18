@@ -71,11 +71,6 @@ class Location {
 
     func collapseTilespace() {
 
-        func isAdjacent(to tile: Tile) -> Bool {
-
-            return isHorizontallyAdjacent(to: tile) || isVerticallyAdjacent(to: tile)
-        }
-
         func isHorizontallyAdjacent(to tile: Tile) -> Bool {
 
             if let adjacentTile = east.tile, adjacentTile == tile { return true }
@@ -92,12 +87,17 @@ class Location {
             return false
         }
 
-        func random(when adjacent: (Tile) -> Bool, to tile: Tile, wins odds: Int, of total: Int) -> Bool {
+        func isGenerallyAdjacent(to tile: Tile) -> Bool {
 
-            tilespace.contains(tile) && adjacent(tile) && Int.random(in: 1 ... total) <= odds
+            return isHorizontallyAdjacent(to: tile) || isVerticallyAdjacent(to: tile)
         }
 
-        tile = if random(when: isAdjacent, to: OPEN_FLOOR, wins: 4, of: 5) {
+        func random(when isAdjacent: (Tile) -> Bool, to tile: Tile, wins odds: Int, of total: Int) -> Bool {
+
+            return tilespace.contains(tile) && isAdjacent(tile) && Int.random(in: 1 ... total) <= odds
+        }
+
+        tile = if random(when: isGenerallyAdjacent, to: OPEN_FLOOR, wins: 4, of: 5) {
 
             OPEN_FLOOR
 
@@ -117,24 +117,34 @@ class Location {
 
     func notifyNeighbours() {
 
-        var easternCongruents:  Set<Tile> = []
+        let notifyEast = east.tile == nil
+        let notifyWest = west.tile == nil
+
+        let notifyNorth = north != nil && north.tile == nil
+        let notifySouth = south != nil && south.tile == nil
+
+        var easternCongruents: Set<Tile> = []
+        var westernCongruents: Set<Tile> = []
+
         var northernCongruents: Set<Tile> = []
-        var westernCongruents:  Set<Tile> = []
         var southernCongruents: Set<Tile> = []
 
-        for candidate in tilespace {
+        for possibility in tilespace {
 
-            easternCongruents.formUnion(congruents[candidate]!.east)
-            northernCongruents.formUnion(congruents[candidate]!.north)
-            westernCongruents.formUnion(congruents[candidate]!.west)
-            southernCongruents.formUnion(congruents[candidate]!.south)
+            let congruent = congruents[possibility]!
+
+            if notifyEast { easternCongruents.formUnion(congruent.east) }
+            if notifyWest { westernCongruents.formUnion(congruent.west) }
+
+            if notifyNorth { northernCongruents.formUnion(congruent.north) }
+            if notifySouth { southernCongruents.formUnion(congruent.south) }
         }
 
-        if east.tile == nil { east.intersectTilespace(with: easternCongruents)  }
-        if west.tile == nil { west.intersectTilespace(with: westernCongruents)  }
+        if notifyEast { east.intersectTilespace(with: easternCongruents)  }
+        if notifyWest { west.intersectTilespace(with: westernCongruents)  }
 
-        if let north, north.tile == nil { north.intersectTilespace(with: northernCongruents) }
-        if let south, south.tile == nil { south.intersectTilespace(with: southernCongruents) }
+        if notifyNorth { north.intersectTilespace(with: northernCongruents) }
+        if notifySouth { south.intersectTilespace(with: southernCongruents) }
     }
 
     func intersectTilespace(with congruents: Set<Tile>) {
